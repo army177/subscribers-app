@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إدارة المشتركين</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: #30363d; --accent: #f0a500; --accent2: #e8890c;
+    --green: #2ea043; --red: #da3633; --blue: #388bfd;
+    --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+    --radius: 10px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Cairo',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; direction:rtl; }
+
+  /* ===== LOADER ===== */
+  #loader {
+    position:fixed; inset:0; background:var(--bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:9999; gap:16px;
+  }
+  .loader-spinner {
+    width:48px; height:48px; border:4px solid var(--border);
+    border-top-color:var(--accent); border-radius:50%;
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loader p { color:var(--text2); font-size:14px; }
+
+  /* ===== LOGIN PAGE ===== */
+  #login-page {
+    display:none; position:fixed; inset:0;
+    background:var(--bg); z-index:500;
+    align-items:center; justify-content:center; flex-direction:column;
+  }
+  #login-page.visible { display:flex; }
+
+  .login-card {
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:16px; padding:40px 36px;
+    width:90%; max-width:420px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  }
+  .login-logo {
+    text-align:center; margin-bottom:28px;
+  }
+  .login-logo .icon {
+    width:64px; height:64px; margin:0 auto 12px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border-radius:16px; display:flex; align-items:center; justify-content:center;
+    font-size:30px;
+  }
+  .login-logo h1 { font-size:22px; font-weight:900; }
+  .login-logo p { font-size:13px; color:var(--text2); margin-top:4px; }
+
+  .login-group { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  .login-group label { font-size:13px; font-weight:700; color:var(--text2); }
+  .login-group input {
+    padding:12px 14px; background:var(--bg3);
+    border:1px solid var(--border); border-radius:9px;
+    color:var(--text); font-family:'Cairo',sans-serif;
+    font-size:14px; outline:none; transition:border-color 0.2s;
+    direction:ltr; text-align:right;
+  }
+  .login-group input:focus { border-color:var(--accent); }
+
+  .login-error {
+    background:rgba(218,54,51,0.12); border:1px solid rgba(218,54,51,0.3);
+    border-radius:8px; padding:10px 14px; font-size:13px; color:#f85149;
+    margin-bottom:14px; display:none;
+  }
+  .login-error.show { display:block; }
+
+  .btn-login {
+    width:100%; padding:13px; border-radius:9px;
+    background:var(--accent); border:none; color:#000;
+    font-family:'Cairo',sans-serif; font-size:15px; font-weight:700;
+    cursor:pointer; transition:all 0.2s; margin-top:4px;
+  }
+  .btn-login:hover { background:var(--accent2); transform:translateY(-1px); }
+  .btn-login:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+
+  /* ===== APP (hidden until login) ===== */
+  #app { display:none; }
+  #app.visible { display:block; }
+
+  /* ===== HEADER ===== */
+  header {
+    background:var(--bg2); border-bottom:1px solid var(--border);
+    padding:12px 20px; display:flex; align-items:center;
+    justify-content:space-between; position:sticky; top:0; z-index:100;
+    flex-wrap:wrap; gap:10px;
+  }
+  .logo { display:flex; align-items:center; gap:10px; }
+  .logo-icon {
+    width:36px; height:36px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:17px;
+  }
+  .logo h1 { font-size:17px; font-weight:700; }
+  .logo span { font-size:11px; color:var(--text2); }
+
+  .header-left { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .header-stats { display:flex; gap:14px; }
+  .hstat { text-align:center; }
+  .hstat .num { font-size:19px; font-weight:900; color:var(--accent); line-height:1; }
+  .hstat .lbl { font-size:10px; color:var(--text3); }
+
+  .user-info {
+    display:flex; align-items:center; gap:8px;
+    background:var(--bg3); border:1px solid var(--border);
+    border-radius:8px; padding:6px 12px; font-size:12px;
+  }
+  .user-avatar {
+    width:26px; height:26px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:#000;
+  }
+  .user-email { color:var(--text2); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .btn-logout {
+    padding:4px 10px; border-radius:6px; border:1px solid var(--border);
+    background:transparent; color:var(--text3); font-family:'Cairo',sans-serif;
+    font-size:11px; cursor:pointer; transition:all 0.15s;
+  }
+  .btn-logout:hover { border-color:var(--red); color:#f85149; }
+
+  #sync-status {
+    font-size:11px; padding:4px 10px; border-radius:20px;
+    font-weight:600; display:flex; align-items:center; gap:5px;
+  }
+  #sync-status.synced { background:rgba(46,160,67,0.15); color:#3fb950; }
+  #sync-status.syncing { background:rgba(240,165,0,0.15); color:var(--accent); }
+  #sync-status.error { background:rgba(218,54,51,0.15); color:#f85149; }
+  .sync-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .sync-dot.pulse { animation:pulse 1.5s infinite; }
+
+  /* ===== TABS ===== */
+  .tabs {
+    display:flex; background:var(--bg2); border-bottom:1px solid var(--border);
+    padding:0 20px; gap:2px; overflow-x:auto;
+  }
+  .tab-btn {
+    padding:11px 16px; border:none; background:none; color:var(--text2);
+    font-family:'Cairo',sans-serif; font-size:13px; font-weight:600;
+    cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s; white-space:nowrap;
+  }
+  .tab-btn:hover { color:var(--text); }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  main { padding:18px; max-width:1400px; margin:0 auto; }
+  .page { display:none; }
+  .page.active { display:block; }
+
+  /* ===== DASHBOARD ===== */
+  .stats-grid {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+    gap:12px; margin-bottom:18px;
+  }
+  .stat-card {
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:var(--radius); padding:16px; position:relative; overflow:hidden;
+  }
+  .stat-card::before { content:''; position:absolute; top:0; right:0; width:4px; height:100%; }
+  .stat-card.gold::before { background:var(--accent); }
+  .stat-card.green::before { background:var(--green); }
+  .stat-card.blue::before { background:var(--blue); }
+  .stat-card.red::before { background:var(--red); }
+  .stat-icon { font-size:24px; margin-bottom:6px; }
+  .stat-num { font-size:28px; font-weight:900; line-height:1; }
+  .stat-card.gold .stat-num { color:var(--accent); }
+  .stat-card.green .stat-num { color:var(--green); }
+  .stat-card.blue .stat-num { color:var(--blue); }
+  .stat-card.red .stat-num { color:var(--red); }
+  .stat-lbl { font-size:12px; color:var(--text2); margin-top:4px; }
+
+  /* ===== SEARCH ===== */
+  .search-bar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .search-wrap { flex:1; min-width:200px; position:relative; }
+  .search-wrap input {
+    width:100%; padding:11px 40px 11px 14px;
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:var(--radius); color:var(--text);
+    font-family:'Cairo',sans-serif; font-size:14px; outline:none; transition:border-color 0.2s;
+  }
+  .search-wrap input:focus { border-color:var(--accent); }
+  .search-wrap .s-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text3); }
+  .filter-select {
+    padding:11px 13px; background:var(--bg2); border:1px solid var(--border);
+    border-radius:var(--radius); color:var(--text);
+    font-family:'Cairo',sans-serif; font-size:13px; outline:none; cursor:pointer;
+  }
+  .filter-select:focus { border-color:var(--accent); }
+
+  /* ===== TABLE ===== */
+  .table-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); overflow:auto; }
+  table { width:100%; border-collapse:collapse; min-width:680px; }
+  thead { background:var(--bg3); }
+  th { padding:11px 13px; text-align:right; font-size:12px; font-weight:700; color:var(--text2); border-bottom:1px solid var(--border); white-space:nowrap; }
+  td { padding:11px 13px; font-size:13px; color:var(--text); border-bottom:1px solid var(--border); vertical-align:middle; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:rgba(240,165,0,0.04); }
+
+  .badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .badge-paid { background:rgba(46,160,67,0.15); color:#3fb950; }
+  .badge-unpaid { background:rgba(218,54,51,0.15); color:#f85149; }
+  .badge-partial { background:rgba(240,165,0,0.15); color:var(--accent); }
+  .badge-cat { background:rgba(56,139,253,0.15); color:#79c0ff; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; }
+
+  .action-btns { display:flex; gap:5px; }
+  .btn-edit, .btn-del {
+    padding:5px 9px; border-radius:6px; border:none; cursor:pointer;
+    font-family:'Cairo',sans-serif; font-size:12px; font-weight:600; transition:all 0.15s;
+  }
+  .btn-edit { background:rgba(56,139,253,0.15); color:#79c0ff; }
+  .btn-edit:hover { background:rgba(56,139,253,0.3); }
+  .btn-del { background:rgba(218,54,51,0.15); color:#f85149; }
+  .btn-del:hover { background:rgba(218,54,51,0.3); }
+
+  .no-results { text-align:center; padding:50px 20px; color:var(--text3); }
+  .no-results .nr-icon { font-size:40px; margin-bottom:10px; opacity:0.4; }
+  .result-count { font-size:13px; color:var(--text2); margin-bottom:10px; }
+  .result-count span { color:var(--accent); font-weight:700; }
+
+  /* ===== FORM ===== */
+  .form-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:22px; max-width:660px; }
+  .form-title { font-size:16px; font-weight:700; margin-bottom:18px; padding-bottom:13px; border-bottom:1px solid var(--border); color:var(--accent); }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+  .form-group { display:flex; flex-direction:column; gap:5px; }
+  .form-group.full { grid-column:1/-1; }
+  label { font-size:12px; font-weight:700; color:var(--text2); }
+  .form-group input, .form-group select, .form-group textarea {
+    padding:10px 12px; background:var(--bg3); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-family:'Cairo',sans-serif;
+    font-size:13px; outline:none; transition:border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:var(--accent); }
+  .form-group textarea { resize:vertical; min-height:70px; }
+  .form-actions { margin-top:16px; display:flex; gap:10px; }
+  .btn-primary {
+    padding:10px 20px; border-radius:8px; background:var(--accent); border:none;
+    color:#000; font-family:'Cairo',sans-serif; font-size:14px; font-weight:700;
+    cursor:pointer; transition:all 0.2s;
+  }
+  .btn-primary:hover { background:var(--accent2); transform:translateY(-1px); }
+  .btn-primary:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+  .btn-secondary {
+    padding:10px 20px; border-radius:8px; background:transparent;
+    border:1px solid var(--border); color:var(--text2);
+    font-family:'Cairo',sans-serif; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .btn-secondary:hover { border-color:var(--text2); color:var(--text); }
+
+  /* ===== TOAST ===== */
+  #toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(100px);
+    background:var(--bg3); border:1px solid var(--border);
+    padding:11px 20px; border-radius:10px; font-size:13px; font-weight:600;
+    transition:transform 0.3s; z-index:9998;
+  }
+  #toast.show { transform:translateX(-50%) translateY(0); }
+  #toast.success { border-color:var(--green); color:#3fb950; }
+  #toast.error { border-color:var(--red); color:#f85149; }
+
+  /* ===== MODAL ===== */
+  .modal-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.75); z-index:300;
+    align-items:center; justify-content:center; padding:16px;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal {
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:var(--radius); padding:22px;
+    width:100%; max-width:560px; max-height:90vh; overflow-y:auto;
+  }
+  .modal-header {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:16px; padding-bottom:13px; border-bottom:1px solid var(--border);
+  }
+  .modal-title { font-size:16px; font-weight:700; color:var(--accent); }
+  .modal-close { background:none; border:none; color:var(--text2); font-size:20px; cursor:pointer; }
+
+  .pay-month { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:10px; }
+  .pay-month-item {
+    background:var(--bg3); border:1px solid var(--border);
+    border-radius:8px; padding:9px; text-align:center; cursor:pointer; transition:all 0.15s;
+  }
+  .pay-month-item:hover { border-color:var(--accent); }
+  .pay-month-item.paid { background:rgba(46,160,67,0.1); border-color:rgba(46,160,67,0.4); }
+  .pay-month-item .m-name { font-size:12px; color:var(--text2); }
+  .pay-month-item .m-status { font-size:11px; font-weight:700; margin-top:3px; }
+  .pay-month-item.paid .m-status { color:#3fb950; }
+  .pay-month-item:not(.paid) .m-status { color:var(--text3); }
+
+  /* ===== IMPORT ===== */
+  .import-box {
+    background:var(--bg2); border:2px dashed var(--border);
+    border-radius:var(--radius); padding:28px; text-align:center;
+    max-width:500px; margin-bottom:18px; cursor:pointer; transition:border-color 0.2s;
+  }
+  .import-box:hover { border-color:var(--accent); }
+  .import-box p { color:var(--text2); font-size:13px; margin-top:8px; }
+
+  @media(max-width:600px) {
+    .form-grid { grid-template-columns:1fr; }
+    .header-stats { gap:10px; }
+    .login-card { padding:28px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-spinner"></div>
+  <p>جاري التحقق من تسجيل الدخول...</p>
+</div>
+
+<!-- LOGIN PAGE -->
+<div id="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="icon">👥</div>
+      <h1>إدارة المشتركين</h1>
+      <p>سجل دخول للوصول إلى لوحة التحكم</p>
+    </div>
+    <div class="login-group">
+      <label>البريد الإلكتروني</label>
+      <input type="email" id="login-email" placeholder="example@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-group">
+      <label>كلمة المرور</label>
+      <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn-login" id="login-btn" onclick="doLogin()">🔐 تسجيل الدخول</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">👥</div>
+      <div>
+        <h1>إدارة المشتركين</h1>
+        <span>متصل بـ Firebase ☁️</span>
+      </div>
+    </div>
+    <div class="header-left">
+      <div class="header-stats">
+        <div class="hstat"><div class="num" id="hs-total">—</div><div class="lbl">إجمالي</div></div>
+        <div class="hstat"><div class="num" id="hs-paid">—</div><div class="lbl">مدفوعين</div></div>
+        <div class="hstat"><div class="num" id="hs-unpaid">—</div><div class="lbl">غير مدفوعين</div></div>
+        <div class="hstat"><div class="num" id="hs-revenue">—</div><div class="lbl">الإيراد</div></div>
+      </div>
+      <div id="sync-status" class="syncing">
+        <div class="sync-dot pulse"></div> جاري الاتصال
+      </div>
+      <div class="user-info">
+        <div class="user-avatar" id="user-avatar">أ</div>
+        <span class="user-email" id="user-email">—</span>
+        <button class="btn-logout" onclick="doLogout()">خروج</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showPage('dashboard',this)">📊 لوحة التحكم</button>
+    <button class="tab-btn" onclick="showPage('search',this)">🔍 البحث والعرض</button>
+    <button class="tab-btn" onclick="showPage('add',this)">➕ إضافة مشترك</button>
+    <button class="tab-btn" onclick="showPage('import',this)">📥 استيراد</button>
+  </div>
+
+  <main>
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card gold"><div class="stat-icon">👥</div><div class="stat-num" id="s-total">—</div><div class="stat-lbl">إجمالي المشتركين</div></div>
+        <div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-num" id="s-paid">—</div><div class="stat-lbl">دفعوا الشهر ده</div></div>
+        <div class="stat-card red"><div class="stat-icon">⏳</div><div class="stat-num" id="s-unpaid">—</div><div class="stat-lbl">لسه ما دفعوش</div></div>
+        <div class="stat-card blue"><div class="stat-icon">💰</div><div class="stat-num" id="s-revenue">—</div><div class="stat-lbl">إيراد الشهر (جنيه)</div></div>
+      </div>
+      <div id="cat-breakdown" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;"></div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="page" id="page-search">
+      <div class="search-bar">
+        <div class="search-wrap">
+          <span class="s-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="ابحث بالاسم أو رقم الهاتف..." oninput="renderTable()">
+        </div>
+        <select class="filter-select" id="filter-cat" onchange="renderTable()">
+          <option value="">كل التصنيفات</option>
+        </select>
+        <select class="filter-select" id="filter-status" onchange="renderTable()">
+          <option value="">كل الحالات</option>
+          <option value="paid">مدفوع</option>
+          <option value="unpaid">غير مدفوع</option>
+          <option value="partial">جزئي</option>
+        </select>
+      </div>
+      <div class="result-count" id="result-count"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>الاسم</th><th>الهاتف</th><th>التصنيف</th>
+              <th>الاشتراك</th><th>حالة الدفع</th><th>التاريخ</th><th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ADD/EDIT -->
+    <div class="page" id="page-add">
+      <div class="form-card">
+        <div class="form-title" id="form-title">➕ إضافة مشترك جديد</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>الاسم الكامل *</label>
+            <input type="text" id="f-name" placeholder="مثال: أحمد محمد علي">
+          </div>
+          <div class="form-group">
+            <label>رقم الهاتف</label>
+            <input type="text" id="f-phone" placeholder="01xxxxxxxxx">
+          </div>
+          <div class="form-group">
+            <label>التصنيف *</label>
+            <select id="f-cat">
+              <option value="">اختر تصنيف...</option>
+              <option>أساسي</option><option>مميز</option>
+              <option>VIP</option><option>طلاب</option><option>شركات</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>قيمة الاشتراك الشهري (جنيه) *</label>
+            <input type="number" id="f-amount" placeholder="100" min="0">
+          </div>
+          <div class="form-group">
+            <label>حالة الدفع (الشهر الحالي)</label>
+            <select id="f-status">
+              <option value="unpaid">غير مدفوع</option>
+              <option value="paid">مدفوع</option>
+              <option value="partial">مدفوع جزئي</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>تاريخ بدء الاشتراك</label>
+            <input type="date" id="f-date">
+          </div>
+          <div class="form-group full">
+            <label>ملاحظات</label>
+            <textarea id="f-notes" placeholder="أي ملاحظات إضافية..."></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" id="save-btn" onclick="saveSubscriber()">💾 حفظ</button>
+          <button class="btn-secondary" onclick="clearForm()">🗑 مسح</button>
+        </div>
+        <input type="hidden" id="f-editing-id">
+      </div>
+    </div>
+
+    <!-- IMPORT -->
+    <div class="page" id="page-import">
+      <div class="form-card" style="max-width:600px">
+        <div class="form-title">📥 استيراد مشتركين</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.8">
+          ارفع ملف CSV — ترتيب الأعمدة:<br>
+          <strong style="color:var(--accent)">الاسم، الهاتف، التصنيف، قيمة الاشتراك، حالة الدفع، التاريخ، ملاحظات</strong>
+        </p>
+        <div class="import-box" onclick="document.getElementById('csv-file').click()">
+          <div style="font-size:34px">📂</div>
+          <p>اضغط لاختيار ملف CSV</p>
+        </div>
+        <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="importCSV(event)">
+        <div id="import-preview"></div>
+
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px">✍️ أو أضف أسماء مباشرة (اسم في كل سطر):</div>
+          <textarea id="bulk-names" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;outline:none;height:110px;resize:vertical" placeholder="أحمد محمد&#10;فاطمة علي&#10;محمد حسن"></textarea>
+          <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center">
+            <select class="filter-select" id="bulk-cat">
+              <option value="">التصنيف...</option>
+              <option>أساسي</option><option>مميز</option><option>VIP</option><option>طلاب</option><option>شركات</option>
+            </select>
+            <input type="number" id="bulk-amount" placeholder="قيمة الاشتراك" style="padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;outline:none;width:140px">
+            <button class="btn-primary" onclick="bulkAdd()">➕ إضافة الكل</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">تفاصيل المشترك</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, updateDoc,
+  deleteDoc, doc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword,
+  signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+// ===== CONFIG =====
+const firebaseConfig = {
+  apiKey: "AIzaSyC5gDwdvZH7owRHp_fIpA6CCRfMsujYTZs",
+  authDomain: "abodra3-671bf.firebaseapp.com",
+  projectId: "abodra3-671bf",
+  storageBucket: "abodra3-671bf.firebasestorage.app",
+  messagingSenderId: "969023175378",
+  appId: "1:969023175378:web:9a35b07e06b6f360188b0b"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const COL = "subscribers";
+
+let subscribers = [];
+let unsubscribeSnapshot = null;
+const MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+// ===== AUTH STATE =====
+onAuthStateChanged(auth, (user) => {
+  document.getElementById('loader').style.display = 'none';
+  if (user) {
+    // Logged in — show app
+    document.getElementById('login-page').classList.remove('visible');
+    document.getElementById('app').classList.add('visible');
+    // Show user info
+    const email = user.email;
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('user-avatar').textContent = email.charAt(0).toUpperCase();
+    // Start data listener
+    startListening();
+  } else {
+    // Not logged in — show login
+    document.getElementById('app').classList.remove('visible');
+    document.getElementById('login-page').classList.add('visible');
+    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+    subscribers = [];
+  }
+});
+
+// ===== LOGIN =====
+window.doLogin = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+
+  if (!email || !pass) {
+    errEl.textContent = '❌ أدخل الإيميل وكلمة المرور';
+    errEl.classList.add('show'); return;
+  }
+
+  btn.disabled = true; btn.textContent = '⏳ جاري تسجيل الدخول...';
+  errEl.classList.remove('show');
+
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    // onAuthStateChanged will handle the rest
+  } catch (e) {
+    let msg = '❌ خطأ في تسجيل الدخول';
+    if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential')
+      msg = '❌ الإيميل أو كلمة المرور غلط';
+    else if (e.code === 'auth/too-many-requests')
+      msg = '❌ كتير أوي — استنى شوية وحاول تاني';
+    errEl.textContent = msg;
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔐 تسجيل الدخول';
+  }
+}
+
+window.doLogout = async function() {
+  if (!confirm('هل تريد تسجيل الخروج؟')) return;
+  await signOut(auth);
+  showToast('👋 تم تسجيل الخروج', 'success');
+}
+
+// ===== REALTIME DATA =====
+function startListening() {
+  setSyncStatus('syncing');
+  unsubscribeSnapshot = onSnapshot(collection(db, COL), (snapshot) => {
+    subscribers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    setSyncStatus('synced');
+    updateStats();
+    renderTable();
+  }, (err) => {
+    setSyncStatus('error');
+    showToast('❌ خطأ في الاتصال', 'error');
+  });
+}
+
+// ===== SYNC STATUS =====
+function setSyncStatus(state) {
+  const el = document.getElementById('sync-status');
+  if (state === 'synced') {
+    el.className = 'synced'; el.innerHTML = '<div class="sync-dot"></div> متصل ☁️';
+  } else if (state === 'syncing') {
+    el.className = 'syncing'; el.innerHTML = '<div class="sync-dot pulse"></div> جاري الحفظ...';
+  } else {
+    el.className = 'error'; el.innerHTML = '<div class="sync-dot"></div> خطأ';
+  }
+}
+
+// ===== STATS =====
+window.updateStats = function() {
+  const total = subscribers.length;
+  const paid = subscribers.filter(s => s.status === 'paid').length;
+  const unpaid = subscribers.filter(s => s.status !== 'paid').length;
+  const revenue = subscribers.filter(s => s.status === 'paid').reduce((a,s) => a + Number(s.amount||0), 0);
+
+  ['total','paid','unpaid'].forEach(k => {
+    const v = k==='total'?total:k==='paid'?paid:unpaid;
+    document.getElementById('s-'+k).textContent = v;
+    document.getElementById('hs-'+k).textContent = v;
+  });
+  document.getElementById('s-revenue').textContent = revenue.toLocaleString();
+  document.getElementById('hs-revenue').textContent = revenue.toLocaleString();
+
+  const cats = {};
+  subscribers.forEach(s => {
+    const c = s.category || 'غير محدد';
+    if (!cats[c]) cats[c] = {total:0,paid:0};
+    cats[c].total++;
+    if (s.status==='paid') cats[c].paid++;
+  });
+
+  document.getElementById('cat-breakdown').innerHTML = Object.entries(cats).map(([c,v]) => `
+    <div class="stat-card blue" style="padding:13px">
+      <div style="font-size:13px;font-weight:700;color:#79c0ff;margin-bottom:7px">${c}</div>
+      <div style="display:flex;gap:13px">
+        <div><div style="font-size:19px;font-weight:900">${v.total}</div><div style="font-size:10px;color:var(--text3)">إجمالي</div></div>
+        <div><div style="font-size:19px;font-weight:900;color:#3fb950">${v.paid}</div><div style="font-size:10px;color:var(--text3)">مدفوع</div></div>
+        <div><div style="font-size:19px;font-weight:900;color:#f85149">${v.total-v.paid}</div><div style="font-size:10px;color:var(--text3)">متبقي</div></div>
+      </div>
+    </div>
+  `).join('');
+
+  const fc = document.getElementById('filter-cat');
+  const cur = fc.value;
+  fc.innerHTML = '<option value="">كل التصنيفات</option>' +
+    Object.keys(cats).map(c => `<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('');
+}
+
+// ===== TABLE =====
+window.renderTable = function() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const cat = document.getElementById('filter-cat').value;
+  const status = document.getElementById('filter-status').value;
+
+  const filtered = subscribers.filter(s => {
+    return (!q || (s.name||'').toLowerCase().includes(q) || (s.phone||'').includes(q))
+      && (!cat || s.category===cat)
+      && (!status || s.status===status);
+  });
+
+  document.getElementById('result-count').innerHTML =
+    `عرض <span>${filtered.length}</span> من <span>${subscribers.length}</span> مشترك`;
+
+  const tbody = document.getElementById('table-body');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="no-results"><div class="nr-icon">🔍</div>لا توجد نتائج</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((s,i) => {
+    const badge = s.status==='paid'
+      ? `<span class="badge badge-paid">✅ مدفوع</span>`
+      : s.status==='partial'
+      ? `<span class="badge badge-partial">⚡ جزئي</span>`
+      : `<span class="badge badge-unpaid">❌ غير مدفوع</span>`;
+    return `<tr>
+      <td style="color:var(--text3)">${i+1}</td>
+      <td style="font-weight:600;cursor:pointer;color:#79c0ff" onclick="showDetail('${s.id}')">${s.name||'—'}</td>
+      <td style="direction:ltr;text-align:right">${s.phone||'—'}</td>
+      <td><span class="badge-cat">${s.category||'—'}</span></td>
+      <td style="font-weight:700;color:var(--accent)">${Number(s.amount||0).toLocaleString()} ج</td>
+      <td>${badge}</td>
+      <td style="color:var(--text3);font-size:12px">${s.date||'—'}</td>
+      <td><div class="action-btns">
+        <button class="btn-edit" onclick="editSubscriber('${s.id}')">✏️ تعديل</button>
+        <button class="btn-del" onclick="deleteSubscriber('${s.id}')">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== SAVE =====
+window.saveSubscriber = async function() {
+  const name = document.getElementById('f-name').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const category = document.getElementById('f-cat').value;
+  const amount = document.getElementById('f-amount').value;
+  const status = document.getElementById('f-status').value;
+  const date = document.getElementById('f-date').value;
+  const notes = document.getElementById('f-notes').value.trim();
+  const eid = document.getElementById('f-editing-id').value;
+
+  if (!name) { showToast('❌ الاسم مطلوب', 'error'); return; }
+  if (!category) { showToast('❌ التصنيف مطلوب', 'error'); return; }
+  if (!amount) { showToast('❌ قيمة الاشتراك مطلوبة', 'error'); return; }
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+  setSyncStatus('syncing');
+
+  try {
+    const data = {name, phone, category, amount:Number(amount), status, date, notes};
+    if (eid) {
+      await updateDoc(doc(db, COL, eid), data);
+      showToast('✅ تم التعديل بنجاح', 'success');
+    } else {
+      data.payments = {};
+      await addDoc(collection(db, COL), data);
+      showToast('✅ تمت الإضافة بنجاح', 'success');
+    }
+    clearForm();
+    showPage('search', document.querySelectorAll('.tab-btn')[1]);
+  } catch(e) {
+    showToast('❌ خطأ: ' + e.message, 'error');
+    setSyncStatus('error');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 حفظ';
+  }
+}
+
+window.editSubscriber = function(id) {
+  const s = subscribers.find(x => x.id===id);
+  if (!s) return;
+  document.getElementById('f-name').value = s.name||'';
+  document.getElementById('f-phone').value = s.phone||'';
+  document.getElementById('f-cat').value = s.category||'';
+  document.getElementById('f-amount').value = s.amount||'';
+  document.getElementById('f-status').value = s.status||'unpaid';
+  document.getElementById('f-date').value = s.date||'';
+  document.getElementById('f-notes').value = s.notes||'';
+  document.getElementById('f-editing-id').value = id;
+  document.getElementById('form-title').textContent = '✏️ تعديل: ' + s.name;
+  showPage('add', document.querySelectorAll('.tab-btn')[2]);
+}
+
+window.deleteSubscriber = async function(id) {
+  const s = subscribers.find(x => x.id===id);
+  if (!confirm(`هل تريد حذف "${s?.name}"؟`)) return;
+  setSyncStatus('syncing');
+  try {
+    await deleteDoc(doc(db, COL, id));
+    showToast('🗑 تم الحذف', 'success');
+  } catch(e) {
+    showToast('❌ خطأ في الحذف', 'error');
+    setSyncStatus('error');
+  }
+}
+
+window.clearForm = function() {
+  ['f-name','f-phone','f-amount','f-notes'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('f-cat').value='';
+  document.getElementById('f-status').value='unpaid';
+  document.getElementById('f-date').value='';
+  document.getElementById('f-editing-id').value='';
+  document.getElementById('form-title').textContent='➕ إضافة مشترك جديد';
+}
+
+// ===== DETAIL MODAL =====
+window.showDetail = function(id) {
+  const s = subscribers.find(x => x.id===id);
+  if (!s) return;
+  document.getElementById('modal-title').textContent = s.name;
+  const badge = s.status==='paid'
+    ? `<span class="badge badge-paid">✅ مدفوع</span>`
+    : s.status==='partial'
+    ? `<span class="badge badge-partial">⚡ جزئي</span>`
+    : `<span class="badge badge-unpaid">❌ غير مدفوع</span>`;
+
+  const pMonths = s.payments||{};
+  const mHtml = MONTHS.map((m,i) => {
+    const isPaid = pMonths[i];
+    return `<div class="pay-month-item ${isPaid?'paid':''}" onclick="togglePayment('${id}',${i})">
+      <div class="m-name">${m}</div>
+      <div class="m-status">${isPaid?'✅ مدفوع':'⭕ لم يُدفع'}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('modal-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--bg3);border-radius:8px;padding:10px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">التصنيف</div>
+        <div style="font-weight:700;color:#79c0ff">${s.category||'—'}</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">الاشتراك الشهري</div>
+        <div style="font-weight:700;color:var(--accent)">${Number(s.amount||0).toLocaleString()} جنيه</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">الهاتف</div>
+        <div style="direction:ltr;text-align:right">${s.phone||'—'}</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">حالة الشهر</div>
+        ${badge}
+      </div>
+    </div>
+    ${s.notes?`<div style="background:var(--bg3);border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:var(--text2)">${s.notes}</div>`:''}
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">سجل الدفع الشهري (اضغط لتغيير الحالة):</div>
+    <div class="pay-month">${mHtml}</div>
+  `;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+window.togglePayment = async function(subId, monthIdx) {
+  const s = subscribers.find(x => x.id===subId);
+  if (!s) return;
+  const payments = {...(s.payments||{})};
+  payments[monthIdx] = !payments[monthIdx];
+  setSyncStatus('syncing');
+  try {
+    await updateDoc(doc(db, COL, subId), {payments});
+  } catch(e) {
+    showToast('❌ خطأ في الحفظ', 'error');
+  }
+  showDetail(subId);
+}
+
+window.closeModal = function(e) {
+  if (!e || e.target===document.getElementById('modal-overlay'))
+    document.getElementById('modal-overlay').classList.remove('open');
+}
+
+// ===== BULK ADD =====
+window.bulkAdd = async function() {
+  const names = document.getElementById('bulk-names').value.trim().split('\n').filter(n=>n.trim());
+  const cat = document.getElementById('bulk-cat').value;
+  const amount = Number(document.getElementById('bulk-amount').value)||0;
+  if (!names.length) { showToast('❌ أدخل أسماء أولاً', 'error'); return; }
+  if (!cat) { showToast('❌ اختر التصنيف', 'error'); return; }
+  setSyncStatus('syncing');
+  showToast('⏳ جاري إضافة ' + names.length + ' مشترك...', 'success');
+  try {
+    for (const name of names) {
+      if (!name.trim()) continue;
+      await addDoc(collection(db, COL), {
+        name:name.trim(), phone:'', category:cat,
+        amount, status:'unpaid', date:'', notes:'', payments:{}
+      });
+    }
+    document.getElementById('bulk-names').value='';
+    showToast('✅ تمت إضافة ' + names.length + ' مشترك', 'success');
+  } catch(e) {
+    showToast('❌ خطأ: ' + e.message, 'error');
+    setSyncStatus('error');
+  }
+}
+
+// ===== CSV IMPORT =====
+window.importCSV = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const lines = e.target.result.split('\n').filter(l=>l.trim());
+    let count = 0;
+    setSyncStatus('syncing');
+    for (const line of lines) {
+      const [name,phone,category,amount,status,date,notes] = line.split(',').map(x=>(x||'').trim());
+      if (!name) continue;
+      await addDoc(collection(db, COL), {
+        name, phone:phone||'', category:category||'أساسي',
+        amount:Number(amount)||0,
+        status:['paid','unpaid','partial'].includes(status)?status:'unpaid',
+        date:date||'', notes:notes||'', payments:{}
+      });
+      count++;
+    }
+    document.getElementById('import-preview').innerHTML =
+      `<div style="margin-top:12px;padding:12px;background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.3);border-radius:8px;color:#3fb950;font-size:13px">✅ تم استيراد ${count} مشترك بنجاح</div>`;
+    showToast('✅ تم استيراد ' + count + ' مشترك', 'success');
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ===== UI =====
+window.showPage = function(name, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name==='search') renderTable();
+}
+
+window.showToast = function(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = type; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
